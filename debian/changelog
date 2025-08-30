@@ -1,3 +1,15 @@
+ddm (0.2.0) unstable; urgency=medium
+
+  * feat: Support VT switching
+
+ -- rewine <luhongxu@uniontech.com>  Thu, 21 Aug 2025 11:43:52 +0800
+
+ddm (0.1.11) unstable; urgency=medium
+
+  * feat: Create a new seatd service for DDE
+
+ -- rewine <luhongxu@uniontech.com>  Thu, 31 Jul 2025 20:03:34 +0800
+
 ddm (0.1.10) unstable; urgency=medium
 
   * fix dde system user not in video group

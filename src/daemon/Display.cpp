@@ -31,6 +31,8 @@
 #include "SocketServer.h"
 #include "Greeter.h"
 #include "Utils.h"
+#include "Messages.h"
+#include "SocketWriter.h"
 
 #include <QDebug>
 #include <QFile>
@@ -138,6 +140,8 @@ namespace DDM {
             m_displayServer = new SingleWaylandDisplayServer(m_socketServer, this);
             m_greeter->setDisplayServerCommand(mainConfig.Single.CompositorCommand.get());
             m_greeter->setSingleMode();
+            // Record current VT as ddm user session
+            DaemonApp::instance()->displayManager()->AddSession({}, seat()->name(), "ddm", static_cast<uint>(VirtualTerminal::currentVt()));
             break;
         }
 
@@ -146,6 +150,9 @@ namespace DDM {
         // restart display after display server ended
         connect(m_displayServer, &DisplayServer::started, this, &Display::displayServerStarted);
         connect(m_displayServer, &DisplayServer::stopped, this, &Display::stop);
+
+        // connect connected signal
+        connect(m_socketServer, &SocketServer::connected, this, &Display::connected);
 
         // connect login signal
         connect(m_socketServer, &SocketServer::login, this, &Display::login);
@@ -363,6 +370,16 @@ namespace DDM {
         emit stopped();
     }
 
+    void Display::connected(QLocalSocket *socket) {
+        m_socket = socket;
+        // send logined user (for possible crash recovery)
+        SocketWriter writer(socket);
+        for (Auth *auth : loginedSession()) {
+            if (auth->isActive())
+                writer << quint32(DaemonMessages::UserLoggedIn) << auth->user();
+        }
+    }
+
     void Display::login(QLocalSocket *socket,
                         const QString &user, const QString &password,
                         const Session &session) {
@@ -537,7 +554,7 @@ namespace DDM {
         // session id
         {
             const QString sessionId = QStringLiteral("Session%1").arg(daemonApp->newSessionId());
-            daemonApp->displayManager()->AddSession(sessionId, seat()->name(), user);
+            daemonApp->displayManager()->AddSession(sessionId, seat()->name(), user, auth->tty());
             env.insert(QStringLiteral("XDG_SESSION_PATH"), daemonApp->displayManager()->sessionPath(sessionId));
             auth->setSessionId(sessionId);
         }
