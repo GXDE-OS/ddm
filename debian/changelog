@@ -1,3 +1,42 @@
+ddm (0.3.0) unstable; urgency=medium
+
+  * fix: fix flash black on login
+  * fix: Fix dde-session not start after treeland logged in
+  * feat: Apply systemd.exec limit options
+  * refactor: Remove unused code
+  * refactor: Refactor display logic
+  * refactor: cut off helper
+  * refactor: Refactor PAM authenticate module
+  * fix: fix dde-session not started after ddm restart & crash recovery
+  * fix: Enable Xauth access control for X11 sessions
+  * fix: fix ddm & treeland startup on Archlinux
+  * fix: remove WAYLAND_DEBUG environment variable in release builds
+  * fix: fix error on Archlinux build
+  * fix: Fix Xwayland not started after crash recover & switch user
+
+ -- rewine <luhongxu@uniontech.com>  Sun, 04 Jan 2026 11:04:28 +0800
+
+ddm (0.2.3) unstable; urgency=medium
+
+  * feat: connect treeland with Logind session
+  * feat: Add logout cleanup
+
+ -- rewine <luhongxu@uniontech.com>  Fri, 14 Nov 2025 11:23:20 +0800
+
+ddm (0.2.2) unstable; urgency=medium
+
+  * feat: Starting sessions other than treeland using ddm
+
+ -- rewine <luhongxu@uniontech.com>  Thu, 30 Oct 2025 13:34:20 +0800
+
+ddm (0.2.1) unstable; urgency=medium
+
+  * chore: update license configuration to REUSE specification
+  * fix: Fix nix build failure & incorrect versioning
+  * fix: fix ddm stuck into dead event loop after crash recovery
+
+ -- rewine <luhongxu@uniontech.com>  Thu, 18 Sep 2025 11:41:30 +0800
+
 ddm (0.2.0) unstable; urgency=medium
 
   * feat: Support VT switching

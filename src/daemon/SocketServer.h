@@ -54,11 +54,12 @@ namespace DDM {
         void login(QLocalSocket *socket,
                    const QString &user, const QString &password,
                    const Session &session);
+        void logout(QLocalSocket *socket,
+                    int id);
         void unlock(QLocalSocket *socket,
                    const QString &user, const QString &password);
         void connected(QLocalSocket *socket);
         void disconnected(QLocalSocket *socket);
-        void requestActivateUser(QLocalSocket *socket, const QString &user);
 
     private:
         QLocalServer *m_server { nullptr };

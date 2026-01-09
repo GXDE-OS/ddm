@@ -1,9 +1,12 @@
 // Copyright (C) 2025 April Lu <apr3vau@outlook.com>.
-// SPDX-License-Identifier: Apache-2.0 OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "TreelandConnector.h"
+#include "Auth.h"
 #include "DaemonApp.h"
+#include "Display.h"
 #include "DisplayManager.h"
+#include "SeatManager.h"
 #include "VirtualTerminal.h"
 #include "treeland-ddm-v1.h"
 
@@ -27,6 +30,17 @@ namespace DDM {
 // Virtural Terminal helper from VirturalTerminal.h
 
 static const char *defaultVtPath = "/dev/tty0";
+
+static bool isVtRunningTreeland(int vtnr) {
+    for (Display *display : daemonApp->seatManager()->displays) {
+        if (display->terminalId == vtnr)
+            return true;
+        for (Auth *auth : display->auths)
+            if (auth->tty == vtnr && auth->type == Display::Treeland)
+                return true;
+    }
+    return false;
+}
 
 /**
  * Callback function of disableRender
@@ -62,14 +76,11 @@ static void renderDisabled([[maybe_unused]] void *data, struct wl_callback *call
     }
 
     auto user = daemonApp->displayManager()->findUserByVt(activeVt);
+    bool isTreeland = isVtRunningTreeland(activeVt);
     auto conn = daemonApp->treelandConnector();
     qDebug("Next VT: %d, user: %s", activeVt, user.isEmpty() ? "None" : qPrintable(user));
 
-    if (user.isEmpty()) {
-        // Switch to a TTY, deactivate treeland session.
-        conn->switchToGreeter();
-        conn->deactivateSession();
-    } else {
+    if (isTreeland) {
         // If user is not empty, it means the switching can be issued by
         // ddm-helper. It uses VT signals from VirtualTerminal.h,
         // which is not what we want, so we should acquire VT control here.
@@ -78,7 +89,11 @@ static void renderDisabled([[maybe_unused]] void *data, struct wl_callback *call
         close(activeVtFd);
 
         conn->enableRender();
-        conn->switchToUser(user);
+        conn->switchToUser(user.isEmpty() ? "dde" : user);
+    } else {
+        // Switch to a TTY, deactivate treeland session.
+        conn->switchToGreeter();
+        conn->deactivateSession();
     }
 }
 
@@ -96,7 +111,7 @@ static void onAcquireDisplay() {
     int vtnr = VirtualTerminal::getVtActive(fd);
     auto user = daemonApp->displayManager()->findUserByVt(vtnr);
     auto conn = daemonApp->treelandConnector();
-    if (!user.isEmpty()) {
+    if (isVtRunningTreeland(vtnr)) {
         qDebug("Activate session at VT %d for user %s", vtnr, qPrintable(user));
         conn->activateSession();
         conn->enableRender();
@@ -115,7 +130,7 @@ static void onReleaseDisplay() {
 // TreelandConnector
 
 TreelandConnector::TreelandConnector() : QObject(nullptr) {
-    VirtualTerminal::setVtSignalHandler(onAcquireDisplay, onReleaseDisplay);
+    setSignalHandler();
 }
 
 TreelandConnector::~TreelandConnector() {
@@ -129,6 +144,10 @@ bool TreelandConnector::isConnected() {
 
 void TreelandConnector::setPrivateObject(struct treeland_ddm *ddm) {
     m_ddm = ddm;
+}
+
+void TreelandConnector::setSignalHandler() {
+    VirtualTerminal::setVtSignalHandler(onAcquireDisplay, onReleaseDisplay);
 }
 
 // Event implementation
@@ -166,7 +185,7 @@ void registerGlobal(void *data, struct wl_registry *registry, uint32_t name, con
 }
 
 void removeGlobal([[maybe_unused]] void *data, [[maybe_unused]] struct wl_registry *registry, [[maybe_unused]] uint32_t name) {
-    // Do not deregister the global object (set m_priv to null) here,
+    // Do not deregister the global object (set m_ddm to null) here,
     // as wlroots will send global_remove event when session deactivated,
     // which is not what we want. The connection will be preserved after that.
 }
@@ -177,6 +196,12 @@ const struct wl_registry_listener registryListener {
 };
 
 void TreelandConnector::connect(QString socketPath) {
+    if (m_display) {
+        wl_display_disconnect(m_display);
+        QObject::disconnect(m_notifier, &QSocketNotifier::activated, nullptr, nullptr);
+        delete m_notifier;
+    }
+
     m_display = wl_display_connect(qPrintable(socketPath));
     auto registry = wl_display_get_registry(m_display);
 

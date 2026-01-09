@@ -31,9 +31,9 @@ namespace DDM {
         Suspend,
         Hibernate,
         HybridSleep,
-        ActivateUser,
         BackToNormal,
         Unlock,
+        Logout,
     };
 
     enum class TreelandMessages {

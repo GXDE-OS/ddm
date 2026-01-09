@@ -26,104 +26,113 @@
 #include <QPointer>
 #include <QDir>
 
-#include "Auth.h"
 #include "Session.h"
 
 class QLocalSocket;
 
 namespace DDM {
-    class Authenticator;
-    class DisplayServer;
-    class Seat;
+    class Auth;
+    class XorgDisplayServer;
+    class TreelandDisplayServer;
+    class SeatManager;
     class SocketServer;
-    class Greeter;
 
+    /** Class represents a display (seat) */
     class Display : public QObject {
         Q_OBJECT
         Q_DISABLE_COPY(Display)
     public:
         enum DisplayServerType {
-            X11DisplayServerType,
-            X11UserDisplayServerType,
-            WaylandDisplayServerType,
-            SingleCompositerServerType
+            X11,
+            Wayland,
+            Treeland
         };
         Q_ENUM(DisplayServerType)
 
-        static DisplayServerType defaultDisplayServerType();
-        explicit Display(Seat *parent, DisplayServerType serverType);
+        /**
+         * Constructor
+         *
+         * @param parent The SeatManager
+         * @param name Seat name
+         */
+        explicit Display(SeatManager *parent, QString name);
+
         ~Display();
 
-        DisplayServerType displayServerType() const;
-        DisplayServer *displayServer() const;
+        /**
+         * Tell Treeland to activate a certain session.
+         *
+         * Called with user = "dde" and xdgSessionId <= 0
+         * will send Treeland into lockscreen.
+         *
+         * @param user Username
+         * @param xdgSessionId Logind session ID
+         */
+        void activateSession(const QString &user, int xdgSessionId);
 
-        int terminalId() const;
+        /** Seat name */
+        QString name{};
 
-        const QString &name() const;
+        /** VT number of the greeter */
+        int terminalId{ 0 };
 
-        QString sessionType() const;
-        QString reuseSessionId() const { return m_reuseSessionId; }
-
-        Seat *seat() const;
-        void switchToUser(const QString &user);
-
-        QVector<Auth*> loginedSession() const {
-            return m_auths;
-        }
+        /** List of active authentications */
+        QList<Auth *> auths;
 
     public slots:
+        /**
+         * Start the display.
+         * This will start Treeland and show greeter.
+         *
+         * @return true on success, false on failure
+         */
         bool start();
+
+        /**
+         * Stop the display.
+         * Will be called automatically when destructed.
+         */
         void stop();
+
+        ///////////////////////////////////////////////////
+        // Slots for socket to communicate with Treeland //
+        ///////////////////////////////////////////////////
 
         void connected(QLocalSocket *socket);
         void login(QLocalSocket *socket,
                    const QString &user, const QString &password,
                    const Session &session);
+        void logout(QLocalSocket *socket,
+                    int id);
         void unlock(QLocalSocket *socket,
                    const QString &user, const QString &password);
-        bool attemptAutologin();
-        void displayServerStarted();
 
     signals:
+        /** Emitted when stop() */
         void stopped();
-        void displayServerFailed();
 
+        /////////////////////////////////////////////////////
+        // Signals for socket to communicate with Treeland //
+        /////////////////////////////////////////////////////
+        
         void loginFailed(QLocalSocket *socket, const QString &user);
         void loginSucceeded(QLocalSocket *socket, const QString &user);
 
     private:
-        QString findGreeterTheme() const;
-        bool findSessionEntry(const QStringList &dirPaths, const QString &name) const;
+        /** Indicates whether the display is started */
+        bool m_started{ false };
 
-        void startAuth(const QString &user, const QString &password,
-                       const Session &session);
-        void startIdentify(const QString &user, const QString &password);
+        /** Treeland display server */
+        TreelandDisplayServer *m_treeland{ nullptr };
 
-        DisplayServerType m_displayServerType = X11DisplayServerType;
+        /** X11 display server, if started */
+        XorgDisplayServer *m_x11Server{ nullptr };
 
-        bool m_relogin { true };
-        bool m_started { false };
-
-        int m_terminalId = 0;
-        int m_sessionTerminalId = 0;
-
-        QString m_reuseSessionId;
-
-        QVector<Auth*> m_auths;
-        Auth* m_currentAuth { nullptr };
-        DisplayServer *m_displayServer { nullptr };
-        Seat *m_seat { nullptr };
+        /** Socket server for communication with Treeland */
         SocketServer *m_socketServer { nullptr };
-        QPointer<QLocalSocket> m_socket;
-        Greeter *m_greeter { nullptr };
 
     private slots:
-        void slotRequestChanged();
-        void slotAuthenticationFinished(const QString &user, bool success, bool identifyOnly);
-        void slotSessionStarted(bool success);
-        void slotHelperFinished(Auth::HelperExitStatus status);
-        void slotAuthInfo(const QString &message, Auth::Info info);
-        void slotAuthError(const QString &message, Auth::Error error);
+        void userProcessFinished(int status);
     };
 }
 
