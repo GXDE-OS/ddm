@@ -30,14 +30,12 @@
 #include <sys/socket.h>
 
 namespace DDM {
-    std::once_flag signalsInitialized;
-
     int sigintFd[2];
     int sigtermFd[2];
     int sigcustomFd[2];
 
     SignalHandler::SignalHandler(QObject *parent) : QObject(parent) {
-        std::call_once(signalsInitialized, &initialize);
+        initialize();
 
         // If it's done before creating the QCoreApplication, it just will not work
         Q_ASSERT(QCoreApplication::instance());
@@ -50,6 +48,24 @@ namespace DDM {
 
         sncustom = new QSocketNotifier(sigcustomFd[1], QSocketNotifier::Read, this);
         connect(sncustom, &QSocketNotifier::activated, this, &SignalHandler::handleSigCustom);
+    }
+
+    SignalHandler::~SignalHandler() {
+        struct sigaction sa_default;
+        sa_default.sa_handler = SIG_DFL;
+        sigaction(SIGINT, &sa_default, NULL);
+        sigaction(SIGTERM, &sa_default, NULL);
+        for (int signal : customSignals)
+            sigaction(signal, &sa_default, NULL);
+        snint->setEnabled(false);
+        snterm->setEnabled(false);
+        sncustom->setEnabled(false);
+        ::close(sigintFd[0]);
+        ::close(sigintFd[1]);
+        ::close(sigtermFd[0]);
+        ::close(sigtermFd[1]);
+        ::close(sigcustomFd[0]);
+        ::close(sigcustomFd[1]);
     }
 
     void SignalHandler::initialize() {
@@ -94,6 +110,7 @@ namespace DDM {
             qCritical() << "Failed to set up " << strsignal(signal) << " handler.";
             return;
         }
+        customSignals.append(signal);
     }
 
     void SignalHandler::intSignalHandler(int) {

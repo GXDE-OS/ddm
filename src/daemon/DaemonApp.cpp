@@ -88,32 +88,11 @@ namespace DDM {
         // log message
         qDebug() << "Starting...";
 
-        // initialize seats only after signals are connected
         m_seatManager->initialize();
     }
 
     QString DaemonApp::hostName() const {
         return QHostInfo::localHostName();
-    }
-
-    DisplayManager *DaemonApp::displayManager() const {
-        return m_displayManager;
-    }
-
-    PowerManager *DaemonApp::powerManager() const {
-        return m_powerManager;
-    }
-
-    SeatManager *DaemonApp::seatManager() const {
-        return m_seatManager;
-    }
-
-    SignalHandler *DaemonApp::signalHandler() const {
-        return m_signalHandler;
-    }
-
-    TreelandConnector *DaemonApp::treelandConnector() const {
-        return m_treelandConnector;
     }
 
     int DaemonApp::newSessionId() {

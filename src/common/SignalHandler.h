@@ -21,6 +21,7 @@
 #define DDM_SIGNALHANDLER_H
 
 #include <QObject>
+#include <QList>
 
 class QSocketNotifier;
 
@@ -30,6 +31,7 @@ namespace DDM {
         Q_DISABLE_COPY(SignalHandler)
     public:
         SignalHandler(QObject *parent = 0);
+        ~SignalHandler();
 
         void addCustomSignal(int signal);
 
@@ -53,6 +55,8 @@ namespace DDM {
         QSocketNotifier *snint { nullptr };
         QSocketNotifier *snterm { nullptr };
         QSocketNotifier *sncustom { nullptr };
+
+        QList<int> customSignals{};
     };
 }
 #endif // DDM_SIGNALHANDLER_H

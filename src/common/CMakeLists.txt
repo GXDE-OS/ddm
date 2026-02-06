@@ -7,7 +7,6 @@ set(PUBLIC_HEADERS
     ${CMAKE_SOURCE_DIR}/src/common/Session.h
     ${CMAKE_SOURCE_DIR}/src/common/SignalHandler.h
     ${CMAKE_SOURCE_DIR}/src/common/SocketWriter.h
-    ${CMAKE_SOURCE_DIR}/src/common/VirtualTerminal.h
     ${CMAKE_SOURCE_DIR}/src/common/XAuth.h
     ${CMAKE_BINARY_DIR}/src/common/Constants.h
     ${CMAKE_SOURCE_DIR}/src/common/LogindDBusTypes.h
@@ -19,7 +18,6 @@ set(SRCS
     ${CMAKE_SOURCE_DIR}/src/common/Session.cpp
     ${CMAKE_SOURCE_DIR}/src/common/SignalHandler.cpp
     ${CMAKE_SOURCE_DIR}/src/common/SocketWriter.cpp
-    ${CMAKE_SOURCE_DIR}/src/common/VirtualTerminal.cpp
     ${CMAKE_SOURCE_DIR}/src/common/XAuth.cpp
     ${CMAKE_SOURCE_DIR}/src/common/LogindDBusTypes.cpp
 )
@@ -35,10 +33,9 @@ set_target_properties(common PROPERTIES
 
 target_link_libraries(common
     PRIVATE
-        Qt${QT_MAJOR_VERSION}::DBus
-        Qt${QT_MAJOR_VERSION}::Network
-        Qt${QT_MAJOR_VERSION}::Qml
-        ${LIBXAU_LINK_LIBRARIES}
+        Qt6::DBus
+        Qt6::Network
+        PkgConfig::LibXau
 )
 
 target_include_directories(common INTERFACE

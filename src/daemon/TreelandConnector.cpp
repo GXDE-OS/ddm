@@ -196,11 +196,7 @@ const struct wl_registry_listener registryListener {
 };
 
 void TreelandConnector::connect(QString socketPath) {
-    if (m_display) {
-        wl_display_disconnect(m_display);
-        QObject::disconnect(m_notifier, &QSocketNotifier::activated, nullptr, nullptr);
-        delete m_notifier;
-    }
+    disconnect();
 
     m_display = wl_display_connect(qPrintable(socketPath));
     auto registry = wl_display_get_registry(m_display);
@@ -209,16 +205,31 @@ void TreelandConnector::connect(QString socketPath) {
 
     wl_display_roundtrip(m_display);
 
-    while (wl_display_prepare_read(m_display) != 0)
-        wl_display_dispatch_pending(m_display);
+    while (wl_display_dispatch_pending(m_display) > 0);
     wl_display_flush(m_display);
     m_notifier = new QSocketNotifier(wl_display_get_fd(m_display), QSocketNotifier::Read);
     QObject::connect(m_notifier, &QSocketNotifier::activated, this, [this] {
-      wl_display_read_events(m_display);
-      while (wl_display_prepare_read(m_display) != 0)
-        wl_display_dispatch_pending(m_display);
-      wl_display_flush(m_display);
+        if (wl_display_dispatch(m_display) == -1 || wl_display_flush(m_display) == -1) {
+            if (errno != EAGAIN) {
+                qWarning("Treeland connection lost!");
+                disconnect();
+            }
+        }
     });
+}
+
+void TreelandConnector::disconnect() {
+    if (m_display) {
+        if (m_notifier)
+            m_notifier->setEnabled(false);
+        wl_display_disconnect(m_display);
+        if (m_notifier) {
+            m_notifier->deleteLater();
+            m_notifier = nullptr;
+        }
+        m_display = nullptr;
+    }
+    m_ddm = nullptr;
 }
 
 // Request wrapper
