@@ -1,23 +1,24 @@
 /***************************************************************************
-* Copyright (c) 2014-2015 Pier Luigi Fiorini <pierluigi.fiorini@gmail.com>
-* Copyright (c) 2014 Martin Bříza <mbriza@redhat.com>
-* Copyright (c) 2013 Abdurrahman AVCI <abdurrahmanavci@gmail.com>
-*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation; either version 2 of the License, or
-* (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the
-* Free Software Foundation, Inc.,
-* 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-***************************************************************************/
+ * Copyright (C) 2025-2026 UnionTech Software Technology Co., Ltd.
+ * Copyright (c) 2014-2015 Pier Luigi Fiorini <pierluigi.fiorini@gmail.com>
+ * Copyright (c) 2014 Martin Bříza <mbriza@redhat.com>
+ * Copyright (c) 2013 Abdurrahman AVCI <abdurrahmanavci@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the
+ * Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ ***************************************************************************/
 
 #include "Display.h"
 
@@ -25,54 +26,61 @@
 #include "Configuration.h"
 #include "DaemonApp.h"
 #include "DisplayManager.h"
-#include "XorgDisplayServer.h"
-#include "TreelandDisplayServer.h"
+#include "Messages.h"
 #include "SeatManager.h"
 #include "SocketServer.h"
-#include "Messages.h"
 #include "SocketWriter.h"
 #include "TreelandConnector.h"
+#include "TreelandDisplayServer.h"
+#include "XorgDisplayServer.h"
 
+#include "config.h"
+#include "Login1Manager.h"
+#include "VirtualTerminal.h"
+
+#include <QDBusConnection>
 #include <QDebug>
 #include <QFile>
-#include <QTimer>
 #include <QLocalSocket>
+#include <QScopeGuard>
+#include <QTimer>
 
+#include <fcntl.h>
 #include <linux/vt.h>
 #include <pwd.h>
 #include <qstringliteral.h>
-#include <unistd.h>
-#include <sys/time.h>
-
+#include <systemd/sd-login.h>
 #include <sys/ioctl.h>
-#include <fcntl.h>
-
-#include <QDBusConnection>
-#include <QDBusMessage>
-#include <QDBusReply>
-
-#include "Login1Manager.h"
-#include "Login1Session.h"
-#include "VirtualTerminal.h"
-#include "config.h"
+#include <sys/time.h>
+#include <unistd.h>
 
 #define STRINGIFY(x) #x
 
 namespace DDM {
     static bool isTtyInUse(const QString &desiredTty) {
-        if (Logind::isAvailable()) {
-            OrgFreedesktopLogin1ManagerInterface manager(Logind::serviceName(), Logind::managerPath(), QDBusConnection::systemBus());
-            auto reply = manager.ListSessions();
-            reply.waitForFinished();
-
-            const auto info = reply.value();
-            for(const SessionInfo &s : info) {
-                OrgFreedesktopLogin1SessionInterface session(Logind::serviceName(), s.sessionPath.path(), QDBusConnection::systemBus());
-                if (desiredTty == session.tTY() && session.state() != QLatin1String("closing")) {
-                    qDebug() << "tty" << desiredTty << "already in use by" << session.user().path.path() << session.state()
-                                      << session.display() << session.desktop() << session.vTNr();
-                    return true;
-                }
+        char **sessions = nullptr;
+        auto guard = qScopeGuard([&sessions] {
+            if (sessions) {
+                for (char **s = sessions; s && *s; ++s)
+                    free(*s);
+                free(sessions);
+            }
+        });
+        sd_get_sessions(&sessions);
+        for (char **s = sessions; s && *s; ++s) {
+            char *tty = nullptr;
+            char *state = nullptr;
+            auto guard2 = qScopeGuard([&tty, &state] {
+                if (tty)
+                    free(tty);
+                if (state)
+                    free(state);
+            });
+            if (sd_session_get_tty(*s, &tty) < 0 || sd_session_get_state(*s, &state) < 0)
+                continue;
+            if (desiredTty == tty && strcmp(state, "closing") != 0) {
+                qDebug() << "tty" << desiredTty << "already in use by session" << *s;
+                return true;
             }
         }
         return false;
@@ -115,12 +123,14 @@ namespace DDM {
         // connect logout signal
         connect(m_socketServer, &SocketServer::logout, this, &Display::logout);
 
+        // connect lock signal
+        connect(m_socketServer, &SocketServer::lock, this, &Display::lock);
+
         // connect unlock signal
         connect(m_socketServer, &SocketServer::unlock,this, &Display::unlock);
 
         // connect login result signals
         connect(this, &Display::loginFailed, m_socketServer, &SocketServer::loginFailed);
-        connect(this, &Display::loginSucceeded, m_socketServer, &SocketServer::loginSucceeded);
     }
 
     Display::~Display() {
@@ -206,9 +216,12 @@ namespace DDM {
                         const QString &user, const QString &password,
                         const Session &session) {
         if (user == QLatin1String("dde")) {
+            qWarning() << "Login attempt for user dde";
             emit loginFailed(socket, user);
             return;
         }
+
+        qInfo() << "Start login for user" << user;
 
         // Get Auth object
         Auth *auth = nullptr;
@@ -252,8 +265,8 @@ namespace DDM {
         }
 
         // some information
-        qDebug() << "Session" << session.fileName() << "selected, command:" << session.exec()
-                 << "for VT" << auth->tty;
+        qInfo() << "Authentication succeeded for user" << user << ", opening session"
+                << session.fileName() << ", command:" << session.exec() << ", VT:" << auth->tty;
 
         // save last user and last session
         DaemonApp::instance()->displayManager()->setLastActivatedUser(user);
@@ -299,11 +312,13 @@ namespace DDM {
         } else if (session.xdgSessionType() == QLatin1String("x11")) {
             auth->type = X11;
 
+            qInfo() << "Stopping Treeland";
             daemonApp->treelandConnector()->disconnect();
             m_treeland->stop();
             QThread::msleep(500); // give some time to treeland to stop properly
 
             // Start X server
+            qInfo() << "Starting X11 display server";
             m_x11Server = new XorgDisplayServer(this);
             connect(m_x11Server, &XorgDisplayServer::stopped, this, &Display::stop);
             if (!m_x11Server->start(auth->tty)) {
@@ -317,6 +332,7 @@ namespace DDM {
         } else {
             auth->type = Wayland;
 
+            qInfo() << "Stopping Treeland";
             daemonApp->treelandConnector()->disconnect();
             m_treeland->stop();
             QThread::msleep(500); // give some time to treeland to stop properly
@@ -331,12 +347,6 @@ namespace DDM {
             return;
         }
 
-        if (auth->type == Treeland) {
-            Q_EMIT loginSucceeded(socket, user);
-            // Tell Treeland to enter the session
-            activateSession(auth->user, xdgSessionId);
-        }
-
         connect(auth, &Auth::sessionFinished, this, [this, auth]() {
             qWarning() << "Session for user" << auth->user << "finished";
             auths.removeAll(auth);
@@ -349,9 +359,11 @@ namespace DDM {
         // The user process is ongoing, append to active auths
         // The auth will be delete later in userProcessFinished()
         auths << auth;
+        qInfo() << "Successfully logged in user" << user;
     }
 
     void Display::logout([[maybe_unused]] QLocalSocket *socket, int id) {
+        qDebug() << "Logout requested for session id" << id;
         // Do not kill the session leader process before
         // TerminateSession! Logind will only kill the session's
         // cgroup (session_stop_scope) when the session is not in
@@ -365,13 +377,22 @@ namespace DDM {
         manager.TerminateSession(QString::number(id));
     }
 
+    void Display::lock([[maybe_unused]] QLocalSocket *socket, int id) {
+        qDebug() << "Lock requested for session id" << id;
+
+        OrgFreedesktopLogin1ManagerInterface manager(Logind::serviceName(),
+                                                     Logind::managerPath(),
+                                                     QDBusConnection::systemBus());
+        manager.LockSession(QString::number(id));
+    }
+
     void Display::unlock(QLocalSocket *socket, const QString &user, const QString &password) {
         if (user == QLatin1String("dde")) {
             emit loginFailed(socket, user);
             return;
         }
 
-        qDebug() << "Start identify user" << user;
+        qInfo() << "Start identify user" << user;
 
         // Only run password check
         //
@@ -394,17 +415,16 @@ namespace DDM {
         // Find the auth that started the session, which contains full informations
         for (auto *auth : std::as_const(auths)) {
             if (auth->user == user && auth->xdgSessionId > 0) {
-                if (auth->type == Treeland) {
-                    // TODO: Use exact ID when there're multiple sessions for a user
-                    // TODO: Jump to auth->tty
-                    Q_EMIT loginSucceeded(socket, user);
-                    activateSession(user, auth->xdgSessionId);
-                } else {
-                    VirtualTerminal::jumpToVt(auth->tty, false);
-                }
+                OrgFreedesktopLogin1ManagerInterface manager(Logind::serviceName(),
+                                                             Logind::managerPath(),
+                                                             QDBusConnection::systemBus());
+                manager.UnlockSession(QString::number(auth->xdgSessionId));
+                VirtualTerminal::jumpToVt(auth->tty, false);
+                qInfo() << "Successfully identified user" << user;
                 return;
             }
         }
+        qWarning() << "No active session found for user" << user;
         Q_EMIT loginFailed(socket, user);
     }
 }

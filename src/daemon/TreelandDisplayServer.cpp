@@ -1,4 +1,4 @@
-// Copyright (C) 2023 Dingyuan Zhang <lxz@mkacg.com>.
+// Copyright (C) 2023-2026 UnionTech Software Technology Co., Ltd.
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "TreelandDisplayServer.h"
@@ -80,11 +80,5 @@ void TreelandDisplayServer::activateUser(const QString &user, int xdgSessionId) 
 void TreelandDisplayServer::onLoginFailed(const QString &user) {
     for (auto greeter : m_greeterSockets) {
         SocketWriter(greeter) << quint32(DaemonMessages::LoginFailed) << user;
-    }
-}
-
-void TreelandDisplayServer::onLoginSucceeded(const QString &user) {
-    for (auto greeter : m_greeterSockets) {
-        SocketWriter(greeter) << quint32(DaemonMessages::LoginSucceeded) << user;
     }
 }

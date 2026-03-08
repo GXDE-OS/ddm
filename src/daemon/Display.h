@@ -1,23 +1,24 @@
 /***************************************************************************
-* Copyright (c) 2014-2015 Pier Luigi Fiorini <pierluigi.fiorini@gmail.com>
-* Copyright (c) 2014 Martin Bříza <mbriza@redhat.com>
-* Copyright (c) 2013 Abdurrahman AVCI <abdurrahmanavci@gmail.com>
-*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation; either version 2 of the License, or
-* (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the
-* Free Software Foundation, Inc.,
-* 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-***************************************************************************/
+ * Copyright (C) 2025-2026 UnionTech Software Technology Co., Ltd.
+ * Copyright (c) 2014-2015 Pier Luigi Fiorini <pierluigi.fiorini@gmail.com>
+ * Copyright (c) 2014 Martin Bříza <mbriza@redhat.com>
+ * Copyright (c) 2013 Abdurrahman AVCI <abdurrahmanavci@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the
+ * Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ ***************************************************************************/
 
 #ifndef DDM_DISPLAY_H
 #define DDM_DISPLAY_H
@@ -100,12 +101,12 @@ namespace DDM {
 
         void connected(QLocalSocket *socket);
         void login(QLocalSocket *socket,
-                   const QString &user, const QString &password,
+                   const QString &user,
+                   const QString &password,
                    const Session &session);
-        void logout(QLocalSocket *socket,
-                    int id);
-        void unlock(QLocalSocket *socket,
-                   const QString &user, const QString &password);
+        void logout(QLocalSocket *socket, int id);
+        void lock(QLocalSocket *socket, int id);
+        void unlock(QLocalSocket *socket, const QString &user, const QString &password);
 
     signals:
         /** Emitted when stop() */
@@ -116,7 +117,6 @@ namespace DDM {
         /////////////////////////////////////////////////////
         
         void loginFailed(QLocalSocket *socket, const QString &user);
-        void loginSucceeded(QLocalSocket *socket, const QString &user);
 
     private:
         /** Indicates whether the display is started */

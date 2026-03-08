@@ -1,4 +1,4 @@
-// Copyright (C) 2023 Dingyuan Zhang <lxz@mkacg.com>.
+// Copyright (C) 2023-2026 UnionTech Software Technology Co., Ltd.
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <QMap>
@@ -23,7 +23,6 @@ namespace DDM {
         void stop();
         void activateUser(const QString &user, int xdgSessionId);
         void onLoginFailed(const QString &user);
-        void onLoginSucceeded(const QString &user);
 
     private:
         SocketServer *m_socketServer;

@@ -1,5 +1,6 @@
 /*
  * Session process wrapper
+ * Copyright (C) 2023-2026 UnionTech Software Technology Co., Ltd.
  * Copyright (C) 2015 Pier Luigi Fiorini <pierluigi.fiorini@gmail.com>
  * Copyright (C) 2014 Martin Bříza <mbriza@redhat.com>
  *
@@ -58,7 +59,7 @@ namespace DDM {
         case Display::Treeland: {
             setProgram(mainConfig.Single.SessionCommand.get());
             setArguments(QStringList{ command });
-            qInfo() << "Starting Wayland user session:" << program() << command;
+            qInfo() << "Starting Treeland session:" << program() << command;
             QProcess::start();
             closeWriteChannel();
             closeReadChannel(QProcess::StandardOutput);
