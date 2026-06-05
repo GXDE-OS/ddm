@@ -1,0 +1,7 @@
+[Unit]
+Requires=dde-seatd.service
+After=dde-seatd.service
+
+[Service]
+Environment=LIBSEAT_BACKEND=seatd
+Environment=SEATD_SOCK=/run/dde-seatd.sock

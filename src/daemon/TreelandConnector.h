@@ -3,30 +3,25 @@
 
 #include <QObject>
 #include <QSocketNotifier>
+#include <QString>
 
 struct wl_display;
-struct wl_callback;
 struct treeland_ddm_v1;
 
 namespace DDM {
-class TreelandConnector : QObject {
+class TreelandConnector : public QObject {
     Q_OBJECT
 public:
-    TreelandConnector();
+    explicit TreelandConnector(QObject *parent = nullptr);
     ~TreelandConnector();
     bool isConnected();
+    int mainPid();
     void setPrivateObject(struct treeland_ddm_v1 *ddm);
-    void setSignalHandler();
-    void connect(const QString socketPath);
+    void connect(const QString &socketPath);
     void disconnect();
-
     void switchToGreeter();
-    void switchToUser(const QString username);
-    void ackVtSwitch(const int vtnr);
-    void activateSession();
-    void deactivateSession();
-    void enableRender();
-    struct wl_callback *disableRender();
+    void switchToUser(const QString &username);
+
 private:
     struct wl_display *m_display { nullptr };
     QSocketNotifier *m_notifier { nullptr };
